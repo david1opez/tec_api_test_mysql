@@ -1,150 +1,97 @@
 const mysql = require("../database/db");
 
-/**
-  * Endpoint #1. Agregamos un método de GetAll
-  */
-function getZonas(req,res){
-    console.log("REST de Zonas");
-    var sql = 'SELECT * FROM zona';
-
+async function makeQuery(q) {
+  return new Promise((resolve, reject) => {
     var conn = mysql.getConnection();
-    conn.connect((error)=>{
-        if (error) throw error;
-        conn.query(sql, (error, data, fields) => {
-            if (error) {
-              res.status(500);
-              res.send(error.message);
-            } else {
-              console.log(data);
-              res.json({
-                data,
-              });
-            }
-            conn.end();
-        });
+
+    conn.connect((error) => {
+      if (error) {
+        reject({ status: 500, error: error.message });
+        return;
+      }
+
+      conn.query(q, (error, data, fields) => {
+        if (error) {
+          reject({ status: 500, error: error.message });
+        } else {
+          resolve({ status: 200, data });
+        }
+
+        conn.end();
+      });
     });
+  })
 }
 
-/**
-  * Endpoint #2. Agregamos un método searchById
-  */
-function findById(req,res){
-  console.log("Search de zonas");
-  var sql = 'SELECT * FROM zona WHERE id_zona = ?';
+async function insert(query, data) {
+  return new Promise((resolve, reject) => {
+    try {
+      const connection = mysql.getConnection();
 
-  var id = req.body.id;
+      connection.connect((error) => {
+        if (error) {
+          reject({ status: 500, error: error.message });
+          return;
+        }
 
-  var conn = mysql.getConnection();
-  conn.connect((error)=>{
-      if (error) throw error;
-      var params = [id];
-      conn.execute(sql, params, (error, data, fields) => {
+        connection.query(query, data, (error, result) => {
+          connection.end();
+
           if (error) {
-            res.status(500);
-            res.send(error.message);
+            reject({ status: 500, error: error.message });
+            return;
           } else {
-            console.log(data);
-            res.json({
-              data,
-            });
+            resolve({ status: 200 });
           }
-          conn.end();
+        });
       });
-  });
+    } catch (error) {
+      reject({ status: 500, error: error.message });
+      return;
+    }
+  })
 }
 
 
-/**
-  * Endpoint #3. Agregamos un método Insert
-  */
-function insertZona(req,res){
-  console.log("INSERT de zonas");
-  var sql = 'INSERT INTO ZONA (nombre) values (?)';
+async function getPaneles(req, res) {
+  var query = 'SELECT * FROM PanelesSolares';
 
-  var nombre = req.body.nombre;
+  try {
+    const result = await makeQuery(query);
 
-  var conn = mysql.getConnection();
-  conn.connect((error)=>{
-      if (error) throw error;
-      var params = [nombre];
-      conn.execute(sql, params, (error, data, fields) => {
-          if (error) {
-            res.status(500);
-            res.send(error.message);
-          } else {
-            console.log(data);
-            res.json({
-              status: 200,
-              message: "Zona insertada",
-              affectedRows: data.affectedRows,
-            });
-          }
-          conn.end();
-      });
-  });
+    res.status(result.status);
+
+    if (result.status !== 200) {
+      res.send(result.error);
+    } else {
+      res.json(result.data);
+    }
+  } catch (error) {
+    res.status(500).send(error.error);
+  }
 }
 
+async function setPanel(req, res) {
+  var query = 'INSERT INTO panelessolares (OrientacionOptima, EficienciaEstimada, CostosEstimados, AhorrosEstimados) values (?, ?, ?, ?)';
+  let data = req.body;
 
-/**
-  * Endpoint #4. Agregamos un método Update
-  */
-function updateZona(req,res){
-  console.log("Update de zonas");
-  var sql = 'UPDATE zona SET nombre = ? WHERE id_zona = ?';
+  let params = [
+    data.orientacionOptima,
+    data.eficienciaEstimada,
+    data.costosEstimados,
+    data.ahorrosEstimados
+  ]
 
-  var nombre = req.body.nombre;
-  var id = req.body.id;
+  let result = await insert(query, params);
 
-  var conn = mysql.getConnection();
-  conn.connect((error)=>{
-      if (error) throw error;
-      var params = [nombre,id];
-      conn.execute(sql, params, (error, data, fields) => {
-          if (error) {
-            res.status(500);
-            res.send(error.message);
-          } else {
-            console.log(data);
-            res.json({
-              status: 200,
-              message: "Zona actualizada",
-              affectedRows: data.affectedRows,
-            });
-          }
-          conn.end();
-      });
-  });
+  console.log(result)
+
+  if(result.status != 200) {
+    res.status(500).send('Error')
+  }
+  else {
+    res.status(200).send('Panel Agregado')
+  }
 }
 
-/**
-  * Endpoint #4. Agregamos un método delete
-  */
-function deleteZona(req,res){
-  console.log("DELETE de zonas");
-  var sql = 'DELETE FROM zona WHERE id_zona = ?';
-
-  var id = req.body.id;
-
-  var conn = mysql.getConnection();
-  conn.connect((error)=>{
-      if (error) throw error;
-      var params = [id];
-      conn.execute(sql, params, (error, data, fields) => {
-          if (error) {
-            res.status(500);
-            res.send(error.message);
-          } else {
-            console.log(data);
-            res.json({
-              status: 200,
-              message: "Zona borrada",
-              affectedRows: data.affectedRows,
-            });
-          }
-          conn.end();
-      });
-  });
-}
-
-
-module.exports = {getZonas, findById,insertZona,updateZona,deleteZona};
+module.exports = {getPaneles, setPanel};
